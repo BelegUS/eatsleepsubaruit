@@ -421,7 +421,7 @@ void uart_init(unsigned int baudrate)
     /* Enable USART receiver and transmitter and receive complete interrupt */
     UART0_CONTROL = _BV(RXCIE0)|(1<<RXEN0)|(1<<TXEN0);
     
-    /* Set frame format: asynchronous, 8data, no parity, 1stop bit */
+    /* Set frame format: asynchronous, 8data, even parity, 1stop bit */
     #ifdef URSEL0
     UCSR0C = (1<<URSEL0)|(3<<UCSZ00)|(2<<UPM00);
     #else

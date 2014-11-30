@@ -78,11 +78,17 @@ int getSubaruQueryFromBluetooth(char* buffer4)
 {
 	unsigned int tempChar = UART_NO_DATA;	//Helper temp buffer for chars. Empty at start
 	
-	/*Get chars from BT until correct begining char (STX)
+	/*Get chars from BT until data arrives
 	We do not worry about being stuck here, BT
-	will feed us with data*/
-	while(tempChar != (char)0x02) {
+	will feed us with data.
+	This data will be sanity checked for being
+	the begining of command*/
+	while(tempChar == UART_NO_DATA) {
 		tempChar = uart1_getc();
+	}
+	/* Check if it is correct begining char (STX)*/
+	if(tempChar != (char)0x02) {
+		return 0;
 	}
 	tempChar = UART_NO_DATA;	//Clear the temp buffer.
 	
@@ -146,11 +152,12 @@ int main(void)
 	
     while(1)
     {
+
 		/* Wait for first correct query addresses from Bluetooth */
 		do 
 		{
 			startQueryingSubaru = getSubaruQueryFromBluetooth( queryBuffer );
-		} while(startQueryingSubaru == 0)
+		} while(startQueryingSubaru == 0);
 		uart1_flush();
 		startQueryingSubaru = 0;
 		
@@ -158,7 +165,7 @@ int main(void)
 		do {
 			uart_putsubaru( queryBuffer );
 			_delay_ms(3);
-		} while(uart_available() == 0)
+		} while(uart_available() == 0);
 		
 		/* Receive and transmit collected bytes of data from car until there is new command in BT receive buffer */
 		do {
@@ -169,7 +176,7 @@ int main(void)
 				uart1_putc(s);	//Transmit byte from Car via BT
 			}
 			s = UART_NO_DATA;
-		} while(uart1_available() <= 4)	
+		} while(uart1_available() < 6);
 
 	}
 }
