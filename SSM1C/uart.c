@@ -509,7 +509,7 @@ void uart_puts(const char *s )
     while (*s) 
       uart_putc(*s++);
 
-}/* uart_putsubaru */
+}/* uart_puts */
 
 
 /*************************************************************************

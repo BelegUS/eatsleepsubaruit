@@ -13,7 +13,14 @@
 #include <string.h>
 #include "uart.h"
 
-
+/**********************************************************************************/
+/* Function generates command buffer for querying ECU parameters		          */
+/*																				  */
+/* @param unsigned char msb - Most Significant Byte address of ECU parameter      */
+/* @param unsigned char lsb - Least Significant Byte address of ECU parameter     */
+/* @param char* buffer4 - Buffer to be filled with command data. Size of 4 chars  */
+/* @returns char* buffer4 - Filled with query command buffer. Size of 4 chars     */
+/**********************************************************************************/
 char* queryEcuCommand(unsigned char msb, unsigned char lsb, char* buffer4)
 {
 
@@ -25,7 +32,13 @@ char* queryEcuCommand(unsigned char msb, unsigned char lsb, char* buffer4)
 	return buffer4;
 }
 
-char* queryRomIdCommand(char* buffer4)
+/**********************************************************************************/
+/* Function generates command buffer for querying ECU ROM ID			          */
+/*																				  */
+/* @param char* buffer4 - Buffer to be filled with query command. Size of 4 chars */
+/* @returns char* buffer4 - Filled with query command buffer. Size of 4 chars     */
+/**********************************************************************************/
+char* queryEcuRomIdCommand(char* buffer4)
 {
 
 	buffer4[0]=(char)0x00;
@@ -36,12 +49,37 @@ char* queryRomIdCommand(char* buffer4)
 	return buffer4;
 }
 
-int getQueryAddressBytes(char* buffer2)
+/**********************************************************************************/
+/* Function generates command buffer to stop querying ECU ROM ID		          */
+/*																				  */
+/* @param char* buffer4 - Buffer to be filled with query command. Size of 4 chars */
+/* @returns char* buffer4 - Filled with query command buffer. Size of 4 chars     */
+/**********************************************************************************/
+char* stopQueryEcuCommand(char* buffer4)
+{
+
+	buffer4[0]=(char)0x12;
+	buffer4[1]=(char)0x00;
+	buffer4[2]=(char)0x00;
+	buffer4[3]=(char)0x00;
+	
+	return buffer4;
+}
+
+/**********************************************************************************/
+/* Function gets chars from Bluetooth Module, sanity checks them, then			  */
+/* fills passed buffer with Command, MSB, LSB and "Finisher" of Subaru Query	  */
+/* requested by BT device                                                         */
+/*																				  */
+/* @param char* buffer4 - Buffer to be filled with query command. Size of 4 chars */
+/* @returns integer value 1 if correct query command was received, 0 otherwise    */
+/**********************************************************************************/
+int getSubaruQueryFromBluetooth(char* buffer4)
 {
 	unsigned int tempChar = UART_NO_DATA;	//Helper temp buffer for chars. Empty at start
 	
 	/*Get chars from BT until correct begining char (STX)
-	We do not worry about being stuck here, Telephone
+	We do not worry about being stuck here, BT
 	will feed us with data*/
 	while(tempChar != (char)0x02) {
 		tempChar = uart1_getc();
@@ -50,11 +88,20 @@ int getQueryAddressBytes(char* buffer2)
 	
 	/* Get chars from BT until data arrives
 	We do not worry again, it will arrive.
+	This data will be treated as Command byte of Subaru ECU Query*/
+	while(tempChar == UART_NO_DATA) {
+		tempChar = uart1_getc();
+	}
+	buffer4[0] = (char)tempChar;	//Store Command in buffer
+	tempChar = UART_NO_DATA;	//Clear the temp buffer.	
+	
+	/* Get chars from BT until data arrives
+	We do not worry again, it will arrive.
 	This data will be treated as MSB of Subaru ECU Query*/
 	while(tempChar == UART_NO_DATA) {
 		tempChar = uart1_getc();
 	}
-	buffer2[0] = (char)tempChar;	//Store MSB in buffer
+	buffer4[1] = (char)tempChar;	//Store MSB in buffer
 	tempChar = UART_NO_DATA;	//Clear the temp buffer.
 	
 	/* Get chars from BT until data arrives
@@ -63,8 +110,10 @@ int getQueryAddressBytes(char* buffer2)
 	while(tempChar == UART_NO_DATA) {
 		tempChar = uart1_getc();
 	}
-	buffer2[1] = (char)tempChar;	//Store LSB in buffer
-	tempChar = UART_NO_DATA;	//Clear the temp buffer.	
+	buffer4[2] = (char)tempChar;	//Store LSB in buffer
+	tempChar = UART_NO_DATA;	//Clear the temp buffer.
+	
+	buffer4[3] = (char)0x00;	//Store byte marking end of query in buffer	
 	
 	/* Get chars from BT until data arrives
 	We do not worry again, it will arrive.
@@ -78,67 +127,49 @@ int getQueryAddressBytes(char* buffer2)
 	} else {
 		return 0;	//Something went wrong, data in Buffer isn't OK
 	}
-	
 } 
-
 
 int main(void)
 {
-	unsigned int c = UART_NO_DATA;	//Buffer for things from Console
+	int startQueryingSubaru = 0;	//Buffer for value to check if program can start querying SSM-1
 	unsigned int s = UART_NO_DATA;	//Buffer for things from Subaru
 	unsigned char queryBuffer[4];	//Buffer for complete Subaru Query
-	unsigned char addressBuffer[2];	//Buffer for MSB and LSB to create Subaru Query
 
 	uart_init(UART_BAUD_SELECT(1953,F_CPU));	//UART0, Subaru SSM-1
 	uart1_init(UART_BAUD_SELECT(9600,F_CPU));	//UART1, Bluetooth Module
+	
+	/* Flush UART buffers from any kind of trash that can be there */
+	uart_flush();
+	uart1_flush();
 	
 	sei(); 
 	
     while(1)
     {
-		/* Flush UART buffers */
-		uart_flush();
-		uart1_flush();
-		
-		/* Wait for synchronization (SYN) char from Bluetooth */
-		while(c != (char)0x16)
+		/* Wait for first correct query addresses from Bluetooth */
+		do 
 		{
-			c = uart1_getc();
-		}
-
-		uart_putsubaru( testBuffer );		//Zabezpiecz to - co jeœli auto nie odpowie?						
-	
-			while(1) {
-					while(s == UART_NO_DATA)
-					{
-						s = uart_getc();
-					}	
-				
-			if ( s & UART_FRAME_ERROR )
-            {
-                uart1_puts("Car UART Frame Error: ");
-            }
-            if ( s & UART_OVERRUN_ERROR )
-            {
-                uart1_puts("Car UART Overrun Error: ");
-            }
-            if ( s & UART_BUFFER_OVERFLOW )
-            {
-                //uart1_puts("Car Buffer overflow error: ");
-            }
-			if ( s == UART_NO_DATA || s == 0)
-			{
-				//Do nothing
-			}
-			else {
-				uart1_putc(s);
+			startQueryingSubaru = getSubaruQueryFromBluetooth( queryBuffer );
+		} while(startQueryingSubaru == 0)
+		uart1_flush();
+		startQueryingSubaru = 0;
+		
+		/* Query Subaru SSM until it responds */
+		do {
+			uart_putsubaru( queryBuffer );
+			_delay_ms(3);
+		} while(uart_available() == 0)
+		
+		/* Receive and transmit collected bytes of data from car until there is new command in BT receive buffer */
+		do {
+			s = uart_getc();
+			if(s == UART_NO_DATA || s & UART_FRAME_ERROR || s & UART_OVERRUN_ERROR || s & UART_BUFFER_OVERFLOW) {
+				//Do nothing. Exception handling can be done here.
+			} else {
+				uart1_putc(s);	//Transmit byte from Car via BT
 			}
 			s = UART_NO_DATA;
-				
+		} while(uart1_available() <= 4)	
 
-			}
-	
-			c = UART_NO_DATA;
-		}
-
-    }
+	}
+}
