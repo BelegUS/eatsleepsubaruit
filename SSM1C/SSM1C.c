@@ -1,10 +1,3 @@
-/*
- * SSM1C.c
- *
- * Created: 2014-06-25 22:54:39
- *  Author: BelegUS
- */ 
-
 #include <avr/io.h>
 #include <stdlib.h>
 #include <avr/interrupt.h>
@@ -165,7 +158,7 @@ int main(void)
 		do {
 			uart_putsubaru( queryBuffer );
 			_delay_ms(3);
-		} while(uart_available() == 0);
+		} while(uart_available() == 0 && uart1_available() < 5);
 		
 		/* Receive and transmit collected bytes of data from car until there is new command in BT receive buffer */
 		do {
@@ -176,7 +169,7 @@ int main(void)
 				uart1_putc(s);	//Transmit byte from Car via BT
 			}
 			s = UART_NO_DATA;
-		} while(uart1_available() < 6);
+		} while(uart1_available() < 5);
 
 	}
 }
